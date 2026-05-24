@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kana Flashcards</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Space+Grotesk:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --surface: #ffffff;
+    --ink: #1a1a2e;
+    --ink2: #4a4a6a;
+    --accent-h: #c94040;   /* hiragana red */
+    --accent-k: #2952a3;   /* katakana blue */
+    --accent: #c94040;
+    --correct: #2d7a4f;
+    --wrong: #c94040;
+    --border: #d8d0c0;
+    --shadow: rgba(26,26,46,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Warm paper texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative; z-index: 2;
+    padding: 32px 40px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(32px, 5vw, 52px);
+    letter-spacing: 4px;
+    color: var(--ink);
+  }
+  .logo span { color: var(--accent-h); }
+  .header-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 8px 18px;
+    border: 2px solid var(--ink);
+    border-radius: 40px;
+    background: transparent;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .filter-btn.active-h { background: var(--accent-h); color: white; border-color: var(--accent-h); }
+  .filter-btn.active-k { background: var(--accent-k); color: white; border-color: var(--accent-k); }
+  .filter-btn.active-m { background: var(--ink); color: white; border-color: var(--ink); }
+  .filter-btn:not([class*=active]):hover { background: var(--ink); color: white; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    position: relative; z-index: 2;
+    padding: 14px 40px;
+    background: var(--ink);
+    color: white;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .stat-item { font-size: 13px; font-weight: 300; letter-spacing: 1px; }
+  .stat-item strong { font-weight: 700; font-size: 18px; margin-right: 4px; }
+  .stat-item.correct strong { color: #6ee7a0; }
+  .stat-item.wrong   strong { color: #f87878; }
+  .deck-info {
+    margin-left: auto;
+    font-size: 12px;
+    opacity: .6;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ── MAIN SCENE ── */
+  .scene {
+    position: relative; z-index: 1;
+    perspective: 1200px;
+    width: 380px;
+    max-width: calc(100vw - 48px);
+    height: 280px;
+    margin: 60px auto 40px;
+    cursor: pointer;
+  }
+  .card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(.4,0,.2,1);
+  }
+  .card-inner.flipped { transform: rotateY(180deg); }
+
+  .card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 40px var(--shadow), 0 2px 8px rgba(0,0,0,.08);
+    border: 2px solid transparent;
+  }
+  .card-front {
+    background: white;
+  }
+  .card-back {
+    background: var(--ink);
+    transform: rotateY(180deg);
+    color: white;
+  }
+
+  .card-type-badge {
+    position: absolute;
+    top: 16px; left: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: .5;
+  }
+  .card-kana {
+    font-family: 'Noto Serif JP', serif;
+    font-size: clamp(80px,18vw,120px);
+    line-height: 1;
+    transition: color .2s;
+  }
+  .card-front .card-kana.hira { color: var(--accent-h); }
+  .card-front .card-kana.kata { color: var(--accent-k); }
+
+  .card-hint {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: .4;
+    margin-top: 16px;
+  }
+
+  .card-romaji {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px;
+    letter-spacing: 8px;
+    color: white;
+    line-height: 1;
+  }
+  .card-romaji-sub {
+    font-size: 13px;
+    opacity: .5;
+    margin-top: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .card-back .card-type-badge { color: white; opacity: .4; }
+
+  /* Tap to flip indicator */
+  .flip-indicator {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink2);
+    opacity: .5;
+    margin-bottom: 16px;
+  }
+  .flip-indicator span { animation: pulse 2s ease-in-out infinite; display: inline-block; }
+  @keyframes pulse { 0%,100%{opacity:.5;transform:translateY(0)} 50%{opacity:1;transform:translateY(-3px)} }
+
+  /* ── BUTTONS ── */
+  .action-row {
+    position: relative; z-index: 2;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: center;
+    padding: 0 24px;
+    flex-wrap: wrap;
+  }
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    border: 2px solid transparent;
+    letter-spacing: .5px;
+  }
+  .btn-wrong {
+    background: white;
+    border-color: var(--wrong);
+    color: var(--wrong);
+  }
+  .btn-correct {
+    background: var(--correct);
+    color: white;
+    border-color: var(--correct);
+  }
+  .btn-skip {
+    background: white;
+    border-color: var(--border);
+    color: var(--ink2);
+    padding: 14px 20px;
+  }
+  .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow); }
+  .action-btn:active { transform: translateY(0); }
+
+  /* ── PROGRESS DOTS ── */
+  .progress-dots {
+    position: relative; z-index: 2;
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+    padding: 24px 24px 0;
+    flex-wrap: wrap;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all .3s;
+  }
+  .dot.current { background: var(--ink); transform: scale(1.4); }
+  .dot.correct { background: var(--correct); }
+  .dot.wrong   { background: var(--wrong); }
+  .dot.skipped { background: #aaa; }
+
+  /* ── COMPLETE ── */
+  .complete-screen {
+    display: none;
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 60px 24px;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+  .complete-screen.show { display: block; }
+  .complete-icon { font-size: 64px; margin-bottom: 16px; }
+  .complete-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: 4px;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .complete-sub { color: var(--ink2); font-size: 15px; margin-bottom: 40px; }
+  .complete-stats {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+  }
+  .cstat {
+    background: white;
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 28px;
+    min-width: 120px;
+  }
+  .cstat-num { font-family: 'Bebas Neue', sans-serif; font-size: 44px; }
+  .cstat-num.c { color: var(--correct); }
+  .cstat-num.w { color: var(--wrong); }
+  .cstat-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--ink2); margin-top: 4px; }
+  .restart-btn {
+    padding: 16px 40px;
+    background: var(--ink);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin: 8px;
+    transition: transform .2s;
+  }
+  .restart-btn:hover { transform: translateY(-2px); }
+  .restart-btn.secondary { background: transparent; color: var(--ink); border: 2px solid var(--ink); }
+
+  #main-flow { position: relative; z-index: 2; }
+
+  @media (max-width: 600px) {
+    header, .stats-bar { padding-left: 20px; padding-right: 20px; }
+    .scene { margin-top: 40px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">KANA <span>FLASH</span></div>
+  <div class="header-controls">
+    <button class="filter-btn active-h" id="btnH" onclick="setMode('hiragana')">Hiragana</button>
+    <button class="filter-btn active-k" id="btnK" onclick="setMode('katakana')">Katakana</button>
+    <button class="filter-btn active-m" id="btnM" onclick="setMode('mixed')">Mixed</button>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-item correct"><strong id="statC">0</strong>Got it</div>
+  <div class="stat-item wrong"><strong id="statW">0</strong>Missed</div>
+  <div class="stat-item"><strong id="statR">0</strong>Remaining</div>
+  <div class="deck-info" id="deckInfo">—</div>
+</div>
+
+<div id="main-flow">
+  <div class="scene" id="scene" onclick="flipCard()">
+    <div class="card-inner" id="cardInner">
+      <div class="card-face card-front" id="cardFront">
+        <div class="card-type-badge" id="cardBadge">HIRAGANA</div>
+        <div class="card-kana hira" id="cardChar">あ</div>
+        <div class="card-hint">tap to reveal</div>
+      </div>
+      <div class="card-face card-back">
+        <div class="card-type-badge" id="cardBadge2">HIRAGANA</div>
+        <div class="card-romaji" id="cardRomaji">A</div>
+        <div class="card-romaji-sub" id="cardSub">romaji</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flip-indicator"><span>↑ tap card to flip ↑</span></div>
+
+  <div class="action-row">
+    <button class="action-btn btn-wrong" onclick="markWrong()">✕ Missed</button>
+    <button class="action-btn btn-skip" onclick="skipCard()">→ Skip</button>
+    <button class="action-btn btn-correct" onclick="markCorrect()">✓ Got it</button>
+  </div>
+
+  <div class="progress-dots" id="progressDots"></div>
+</div>
+
+<div class="complete-screen" id="completeScreen">
+  <div class="complete-icon">🎌</div>
+  <div class="complete-title">Deck Complete!</div>
+  <div class="complete-sub" id="completeSub">Here's how you did:</div>
+  <div class="complete-stats">
+    <div class="cstat"><div class="cstat-num c" id="cC">0</div><div class="cstat-label">Correct</div></div>
+    <div class="cstat"><div class="cstat-num w" id="cW">0</div><div class="cstat-label">Missed</div></div>
+    <div class="cstat"><div class="cstat-num" id="cPct">0%</div><div class="cstat-label">Score</div></div>
+  </div>
+  <button class="restart-btn" onclick="restartMissed()">Retry Missed Cards</button>
+  <button class="restart-btn secondary" onclick="restartAll()">Restart All</button>
+</div>
+
+<script>
+const hiragana = [
+  {char:'あ',rom:'a'},{char:'い',rom:'i'},{char:'う',rom:'u'},{char:'え',rom:'e'},{char:'お',rom:'o'},
+  {char:'か',rom:'ka'},{char:'き',rom:'ki'},{char:'く',rom:'ku'},{char:'け',rom:'ke'},{char:'こ',rom:'ko'},
+  {char:'さ',rom:'sa'},{char:'し',rom:'shi'},{char:'す',rom:'su'},{char:'せ',rom:'se'},{char:'そ',rom:'so'},
+  {char:'た',rom:'ta'},{char:'ち',rom:'chi'},{char:'つ',rom:'tsu'},{char:'て',rom:'te'},{char:'と',rom:'to'},
+  {char:'な',rom:'na'},{char:'に',rom:'ni'},{char:'ぬ',rom:'nu'},{char:'ね',rom:'ne'},{char:'の',rom:'no'},
+  {char:'は',rom:'ha'},{char:'ひ',rom:'hi'},{char:'ふ',rom:'fu'},{char:'へ',rom:'he'},{char:'ほ',rom:'ho'},
+  {char:'ま',rom:'ma'},{char:'み',rom:'mi'},{char:'む',rom:'mu'},{char:'め',rom:'me'},{char:'も',rom:'mo'},
+  {char:'や',rom:'ya'},{char:'ゆ',rom:'yu'},{char:'よ',rom:'yo'},
+  {char:'ら',rom:'ra'},{char:'り',rom:'ri'},{char:'る',rom:'ru'},{char:'れ',rom:'re'},{char:'ろ',rom:'ro'},
+  {char:'わ',rom:'wa'},{char:'を',rom:'wo'},{char:'ん',rom:'n'},
+  {char:'が',rom:'ga'},{char:'ぎ',rom:'gi'},{char:'ぐ',rom:'gu'},{char:'げ',rom:'ge'},{char:'ご',rom:'go'},
+  {char:'ざ',rom:'za'},{char:'じ',rom:'ji'},{char:'ず',rom:'zu'},{char:'ぜ',rom:'ze'},{char:'ぞ',rom:'zo'},
+  {char:'だ',rom:'da'},{char:'ぢ',rom:'di'},{char:'づ',rom:'du'},{char:'で',rom:'de'},{char:'ど',rom:'do'},
+  {char:'ば',rom:'ba'},{char:'び',rom:'bi'},{char:'ぶ',rom:'bu'},{char:'べ',rom:'be'},{char:'ぼ',rom:'bo'},
+  {char:'ぱ',rom:'pa'},{char:'ぴ',rom:'pi'},{char:'ぷ',rom:'pu'},{char:'ぺ',rom:'pe'},{char:'ぽ',rom:'po'},
+];
+const katakana = [
+  {char:'ア',rom:'a'},{char:'イ',rom:'i'},{char:'ウ',rom:'u'},{char:'エ',rom:'e'},{char:'オ',rom:'o'},
+  {char:'カ',rom:'ka'},{char:'キ',rom:'ki'},{char:'ク',rom:'ku'},{char:'ケ',rom:'ke'},{char:'コ',rom:'ko'},
+  {char:'サ',rom:'sa'},{char:'シ',rom:'shi'},{char:'ス',rom:'su'},{char:'セ',rom:'se'},{char:'ソ',rom:'so'},
+  {char:'タ',rom:'ta'},{char:'チ',rom:'chi'},{char:'ツ',rom:'tsu'},{char:'テ',rom:'te'},{char:'ト',rom:'to'},
+  {char:'ナ',rom:'na'},{char:'ニ',rom:'ni'},{char:'ヌ',rom:'nu'},{char:'ネ',rom:'ne'},{char:'ノ',rom:'no'},
+  {char:'ハ',rom:'ha'},{char:'ヒ',rom:'hi'},{char:'フ',rom:'fu'},{char:'ヘ',rom:'he'},{char:'ホ',rom:'ho'},
+  {char:'マ',rom:'ma'},{char:'ミ',rom:'mi'},{char:'ム',rom:'mu'},{char:'メ',rom:'me'},{char:'モ',rom:'mo'},
+  {char:'ヤ',rom:'ya'},{char:'ユ',rom:'yu'},{char:'ヨ',rom:'yo'},
+  {char:'ラ',rom:'ra'},{char:'リ',rom:'ri'},{char:'ル',rom:'ru'},{char:'レ',rom:'re'},{char:'ロ',rom:'ro'},
+  {char:'ワ',rom:'wa'},{char:'ヲ',rom:'wo'},{char:'ン',rom:'n'},
+  {char:'ガ',rom:'ga'},{char:'ギ',rom:'gi'},{char:'グ',rom:'gu'},{char:'ゲ',rom:'ge'},{char:'ゴ',rom:'go'},
+  {char:'ザ',rom:'za'},{char:'ジ',rom:'ji'},{char:'ズ',rom:'zu'},{char:'ゼ',rom:'ze'},{char:'ゾ',rom:'zo'},
+  {char:'ダ',rom:'da'},{char:'ヂ',rom:'di'},{char:'ヅ',rom:'du'},{char:'デ',rom:'de'},{char:'ド',rom:'do'},
+  {char:'バ',rom:'ba'},{char:'ビ',rom:'bi'},{char:'ブ',rom:'bu'},{char:'ベ',rom:'be'},{char:'ボ',rom:'bo'},
+  {char:'パ',rom:'pa'},{char:'ピ',rom:'pi'},{char:'プ',rom:'pu'},{char:'ペ',rom:'pe'},{char:'ポ',rom:'po'},
+];
+
+function shuffle(a){ return [...a].sort(()=>Math.random()-.5); }
+function isHira(c){ return c.charCodeAt(0)>=0x3041&&c.charCodeAt(0)<=0x3096; }
+
+let mode='mixed', deck=[], idx=0, results=[], flipped=false, wrongCards=[];
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.className='filter-btn');
+  document.getElementById('btnH').classList.toggle('active-h',m==='hiragana');
+  document.getElementById('btnK').classList.toggle('active-k',m==='katakana');
+  document.getElementById('btnM').classList.toggle('active-m',m==='mixed');
+  buildDeck();
+}
+
+function buildDeck(fromWrong=false){
+  let pool;
+  if(fromWrong) pool=wrongCards;
+  else if(mode==='hiragana') pool=hiragana;
+  else if(mode==='katakana') pool=katakana;
+  else pool=[...hiragana,...katakana];
+  deck=shuffle(pool);
+  idx=0; results=[]; flipped=false; wrongCards=[];
+  document.getElementById('completeScreen').classList.remove('show');
+  document.getElementById('main-flow').style.display='';
+  renderCard();
+  renderDots();
+  updateStats();
+}
+
+function renderCard(){
+  const card=deck[idx];
+  const type=isHira(card.char)?'Hiragana':'Katakana';
+  const colorClass=isHira(card.char)?'hira':'kata';
+  document.getElementById('cardBadge').textContent=type;
+  document.getElementById('cardBadge2').textContent=type;
+  const charEl=document.getElementById('cardChar');
+  charEl.textContent=card.char;
+  charEl.className='card-kana '+colorClass;
+  document.getElementById('cardRomaji').textContent=card.rom.toUpperCase();
+  document.getElementById('cardSub').textContent=type+' · romaji';
+  document.getElementById('cardInner').classList.remove('flipped');
+  flipped=false;
+  document.getElementById('deckInfo').textContent=`Card ${idx+1} of ${deck.length} · ${mode.toUpperCase()}`;
+}
+
+function flipCard(){
+  flipped=!flipped;
+  document.getElementById('cardInner').classList.toggle('flipped',flipped);
+}
+
+function markCorrect(){
+  results[idx]='correct';
+  advance();
+}
+function markWrong(){
+  results[idx]='wrong';
+  wrongCards.push(deck[idx]);
+  advance();
+}
+function skipCard(){
+  results[idx]='skipped';
+  advance();
+}
+
+function advance(){
+  renderDots();
+  if(idx<deck.length-1){
+    idx++;
+    renderCard();
+    renderDots();
+    updateStats();
+  } else {
+    showComplete();
+  }
+}
+
+function renderDots(){
+  const container=document.getElementById('progressDots');
+  container.innerHTML='';
+  deck.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot';
+    if(i===idx) d.classList.add('current');
+    else if(results[i]==='correct') d.classList.add('correct');
+    else if(results[i]==='wrong') d.classList.add('wrong');
+    else if(results[i]==='skipped') d.classList.add('skipped');
+    container.appendChild(d);
+  });
+}
+
+function updateStats(){
+  const c=results.filter(r=>r==='correct').length;
+  const w=results.filter(r=>r==='wrong').length;
+  const rem=deck.length-results.filter(Boolean).length;
+  document.getElementById('statC').textContent=c;
+  document.getElementById('statW').textContent=w;
+  document.getElementById('statR').textContent=rem;
+}
+
+function showComplete(){
+  document.getElementById('main-flow').style.display='none';
+  const c=results.filter(r=>r==='correct').length;
+  const w=results.filter(r=>r==='wrong').length;
+  const pct=Math.round(c/deck.length*100);
+  document.getElementById('cC').textContent=c;
+  document.getElementById('cW').textContent=w;
+  document.getElementById('cPct').textContent=pct+'%';
+  const msgs=[
+    {min:90,t:'Outstanding! ほぼ完璧です！'},
+    {min:70,t:'Great work! よく頑張りました！'},
+    {min:50,t:'Good effort! 練習を続けて！'},
+    {min:0, t:'Keep studying! もっと練習しよう！'},
+  ];
+  document.getElementById('completeSub').textContent=msgs.find(m=>pct>=m.min).t;
+  document.getElementById('completeScreen').classList.add('show');
+}
+
+function restartMissed(){
+  if(wrongCards.length===0){ restartAll(); return; }
+  buildDeck(true);
+}
+function restartAll(){ buildDeck(false); }
+
+// ── KEYBOARD ──
+document.addEventListener('keydown',e=>{
+  if(e.key===' '||e.key==='ArrowUp'){ e.preventDefault(); flipCard(); }
+  else if(e.key==='ArrowRight'||e.key==='l') markCorrect();
+  else if(e.key==='ArrowLeft'||e.key==='j') markWrong();
+  else if(e.key==='ArrowDown'||e.key==='k') skipCard();
+});
+
+setMode('mixed');
+</script>
+</body>
+</html>
