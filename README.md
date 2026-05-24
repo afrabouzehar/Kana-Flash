@@ -1,5 +1,4 @@
 # 🃏 Kana Flash
-### `02_kana_flashcards.html`
 
 A flip-card flashcard app for drilling the complete hiragana and katakana syllabary, including voiced (dakuten) and semi-voiced (handakuten) characters.
 
@@ -78,4 +77,4 @@ Same rows as above in katakana form: ア, カ, サ … パ row.
 
 ---
 
-*Part of the Kana Learning Suite · see also `01_big_kana_test.html` and `03_words_reading_test.html`*
+*Part of the Kana Learning Suite · see also `word reader repository` and `kana master test`*
